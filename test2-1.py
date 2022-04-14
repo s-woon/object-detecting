@@ -1,18 +1,16 @@
-
+import os
 import sys
 import cv2
-from time import sleep, time
+from time import sleep
 
-import imutils
 import numpy as np
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
-from PyQt5 import QtCore
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog, QMessageBox
 from PyQt5.uic import loadUi
 from pytube import YouTube
-from pytube.cli import on_progress
 
+import tensorflow as tf
 
 save_dir = './video'
 
@@ -56,7 +54,7 @@ class Thread(QThread):
 class WindowClass(QMainWindow):
     def __init__(self):
         super(WindowClass, self).__init__()
-        loadUi('main2.ui', self)
+        loadUi('main3.ui', self)
 
         self.th = Thread(self)
 
@@ -66,7 +64,9 @@ class WindowClass(QMainWindow):
         self.startBtn.clicked.connect(self.videostart)
         self.stopBtn.clicked.connect(self.videostop)
 
-        self.detectBtn.clicked.connect(self.detectstart)
+        self.getimgBtn.clicked.connect(self.getimg)
+        self.learningBtn.clicked.connect(self.learning)
+        self.dnwBtn.clicked.connect(self.dnw)
 
         self.actionOpen.triggered.connect(self.videoopen)
 
@@ -74,20 +74,23 @@ class WindowClass(QMainWindow):
     def video(self, image):
         self.videoLb.setPixmap(QPixmap.fromImage(image).scaled(self.videoLb.size(), Qt.KeepAspectRatio))
 
-    def detectstart(self):
+    def getimg(self):
         global source
         if self.lbox.currentItem() == None:
-            QMessageBox.warning(self, '오류', '재생할 동영상 파일이 없습니다.  ')
+            QMessageBox.warning(self, '오류', '동영상 파일이 없습니다.  ')
         else:
             source = self.lbox.currentItem().text()
             if source == '' or None:
                 QMessageBox.warning(self, '오류', '재생할 동영상 파일이 선택되지 않았습니다.  ')
             else:
-                print("Detecting start")
-                global writer
-                fps = 29.97
-                fourcc = cv2.VideoWriter_fourcc(*'DIVX')
-                writer = cv2.VideoWriter(source + '_detecting.avi', fourcc, fps, (1280, 720))
+                print("Get person img start")
+                PATH = './person_imgs'
+
+                try:
+                    if not os.path.exists(PATH):
+                        os.mkdir(PATH)
+                except OSError:
+                    print("Error: Failed to create the directory.")
 
                 weight = './yolov3.weights'
                 cfg = './yolov3.cfg'
@@ -95,82 +98,76 @@ class WindowClass(QMainWindow):
                 classes = None
                 with open('./yolov3.txt', 'r') as f:
                     classes = [line.strip() for line in f.readlines()]
-                layer_names = net.getLayerNames()
-                output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
-                colors = np.random.uniform(0, 255, size=(len(classes), 3))
 
-                vid = cv2.VideoCapture(source)
-                while vid:
-                    ret, img = vid.read()
-                    i = 0
-                    if ret:
-                        # try:
-                        #     prop = cv2.cv.CV_CAP_PROP_FRAME_COUNT if imutils.is_cv2() \
-                        #         else cv2.CAP_PROP_FRAME_COUNT
-                        #     total = int(vid.get(prop))
-                        #     print("[INFO] {} total frames in video".format(total))
-                        # except:
-                        #     print("[INFO] could not determine # of frames in video")
-                        #     print("[INFO] no approx. completion time can be provided")
-                        prop = cv2.CAP_PROP_FRAME_COUNT
-                        total = int(vid.get(prop))
-                        # try:
-                        #     # img = cv2.resize(img, None, fx=0.4, fy=0.4)
-                        #     img = cv2.resize(img, (416, 416))
-                        # except Exception as e:
-                        #     print(str(e))
-                        height, width, channels = img.shape
+                for i in range(150):
+                    sec = int(60 + i * 2)
+                    video = cv2.VideoCapture(source)
+                    video.set(cv2.CAP_PROP_POS_MSEC, sec * 1000)
+                    success, img = video.read()
 
-                        blob = cv2.dnn.blobFromImage(img, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
-                        net.setInput(blob)
-                        outs = net.forward(output_layers)
-
-                        class_ids = []
-                        confidences = []
+                    if success:
+                        Width = img.shape[1]
+                        Height = img.shape[0]
                         boxes = []
-
+                        confidences = []
+                        img_rescale = cv2.resize(img, (224, 224))
+                        scale = 0.00392
+                        blob = cv2.dnn.blobFromImage(img_rescale, scale, (416, 416), (0, 0, 0), True, crop=False)
+                        net.setInput(blob)
+                        path = './person_imgs/' + 'video1_frame' + '_' + str(i) + '_'
+                        conf_t = 0.3
+                        nms_t = 0.4
+                        layer_names = net.getLayerNames()
+                        output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
+                        outs = net.forward(output_layers)
                         for out in outs:
                             for detection in out:
                                 scores = detection[5:]
                                 class_id = np.argmax(scores)
-                                confidence = scores[class_id]
-                                if confidence > 0.5:
-                                    # Object detected
-                                    center_x = int(detection[0] * width)
-                                    center_y = int(detection[1] * height)
-                                    w = int(detection[2] * width)
-                                    h = int(detection[3] * height)
-                                    # 좌표
-                                    x = int(center_x - w / 2)
-                                    y = int(center_y - h / 2)
-                                    boxes.append([x, y, w, h])
-                                    confidences.append(float(confidence))
-                                    class_ids.append(class_id)
+                                if class_id == 0:
+                                    confidence = scores[class_id]
+                                    if confidence > conf_t:
+                                        center_x = int(detection[0] * Width)
+                                        center_y = int(detection[1] * Height)
+                                        w = int(detection[2] * Width)
+                                        h = int(detection[3] * Height)
+                                        x = center_x - w / 2
+                                        y = center_y - h / 2
+                                        confidences.append(float(confidence))
+                                        boxes.append([x, y, w, h])
+                        indices = cv2.dnn.NMSBoxes(boxes, confidences, conf_t, nms_t)
+                        boxes = [boxes[i] for i in indices]
+                        box_fin = [[x, y, x+w, y+h] for [x, y, w, h] in boxes]
+                        imgs = [img[round(y1):round(y2), round(x1):round(x2)] for [x1, y1, x2, y2] in box_fin]
+                        if len(imgs) != 0:
+                            for i in range(len(imgs)):
+                                try:
+                                    cv2.imwrite(path + str(i) + '.jpg', imgs[i])
+                                except:
+                                    pass
 
-                        indexes = cv2.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
+    def learning(self):
+        # print(len(os.listdir('./person_imgs')))
 
-                        font = cv2.FONT_HERSHEY_PLAIN
-                        for i in range(len(boxes)):
-                            if i in indexes:
-                                x, y, w, h = boxes[i]
-                                label = str(classes[class_ids[i]])
-                                color = colors[i]
-                                cv2.rectangle(img, (x, y), (x + w, y + h), color, 2)
-                                cv2.putText(img, label, (x, y - 10), font, 1, color, 3)
+        mobilenet = tf.keras.applications.MobileNetV2(input_shape = (128, 128, 3), include_top = False, weights = 'imagenet')
 
-                        print(img.shape)
-                        writer.write(img)
-                        print(i, "1111")
-                        print("[INFO] {} total frames in video {}/{}".format(total, i, total))
-                writer.release()
-                exit()
+        mobilenet.trainable = True
+        for i in range(len(mobilenet.layers)):
+            mobilenet.layers[i].trainable = False
 
-    def nparr2qimg(self, cvimg):
-        ''' convert cv2 bgr image -> rgb qimg '''
-        h, w, c = cvimg.shape
-        byte_per_line = w * c  # cvimg.step() #* step # NOTE:when image format problem..
-        return QImage(cvimg.data, w, h, byte_per_line,
-                      QImage.Format_RGB888).rgbSwapped()
+        model = tf.keras.Sequential()
+        model.add(mobilenet)
+        model.add(tf.keras.layers.MaxPooling2D(3))
+        model.add(tf.keras.layers.Flatten())
+        model.add(tf.keras.layers.Dense(512, activation='relu'))
+        model.add(tf.keras.layers.BatchNormalization())
+        model.add(tf.keras.layers.Dense(256, activation='relu'))
+        model.add(tf.keras.layers.BatchNormalization())
+        model.add(tf.keras.layers.Dense(6, activation='softmax'))
+        model.summary()
+
+    def dnw(self):
+        pass
 
     def progress_function(self, stream, chunk, bytes_remaining):
         size = self.video.filesize

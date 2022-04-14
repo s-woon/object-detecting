@@ -154,7 +154,7 @@ print('proportion of red : {}'.format(round(len(result[result!=0])/(result.shape
 
 # ### 4. person image crop
 
-# PATH = './person_imgs'
+PATH = './person_imgs'
 # os.mkdir(PATH)
 
 import cv2
