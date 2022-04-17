@@ -10,7 +10,18 @@ from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog, QMessageBox
 from PyQt5.uic import loadUi
 from pytube import YouTube
 
-import tensorflow as tf
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import Flatten, Dense, BatchNormalization, MaxPooling2D
+from tensorflow.keras.callbacks import ModelCheckpoint
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.models import load_model
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+from tensorflow.keras.preprocessing.image import img_to_array, load_img
+from tensorflow.keras.utils import to_categorical
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
 
 save_dir = './video'
 
@@ -145,26 +156,57 @@ class WindowClass(QMainWindow):
                                     cv2.imwrite(path + str(i) + '.jpg', imgs[i])
                                 except:
                                     pass
+                print("Get person img finish")
 
     def learning(self):
         # print(len(os.listdir('./person_imgs')))
 
-        mobilenet = tf.keras.applications.MobileNetV2(input_shape = (128, 128, 3), include_top = False, weights = 'imagenet')
+        mobilenet = MobileNetV2(input_shape = (128, 128, 3), include_top = False, weights = 'imagenet')
 
         mobilenet.trainable = True
         for i in range(len(mobilenet.layers)):
             mobilenet.layers[i].trainable = False
 
-        model = tf.keras.Sequential()
+        model = Sequential()
         model.add(mobilenet)
-        model.add(tf.keras.layers.MaxPooling2D(3))
-        model.add(tf.keras.layers.Flatten())
-        model.add(tf.keras.layers.Dense(512, activation='relu'))
-        model.add(tf.keras.layers.BatchNormalization())
-        model.add(tf.keras.layers.Dense(256, activation='relu'))
-        model.add(tf.keras.layers.BatchNormalization())
-        model.add(tf.keras.layers.Dense(6, activation='softmax'))
+        model.add(MaxPooling2D(3))
+        model.add(Flatten())
+        model.add(Dense(512, activation='relu'))
+        model.add(BatchNormalization())
+        model.add(Dense(256, activation='relu'))
+        model.add(BatchNormalization())
+        model.add(Dense(6, activation='softmax')) # number of classes = 6
         model.summary()
+
+        PATH = './person_imgs/'
+        img_list = os.listdir(PATH)
+        # print(len(img_list))
+        labels = []
+        DATA = []
+
+
+        for i in range(len(img_list)):
+            img = load_img(PATH + img_list[i], target_size=(128, 128))
+            img = img_to_array(img)
+            img = preprocess_input(img)
+            DATA.append(img)
+
+        data = np.array([])
+        for i in range(len(img_list)):
+            data_folder = data
+            data = np.append(data, data_folder)
+            label = len(data_folder) * [img_list[i]]
+            labels.extend(label)
+
+        data = data.reshape(-1, 128, 128, 3)
+        lb = LabelEncoder()
+        labels = lb.fit_transform(labels)
+        labels = to_categorical(labels)
+
+        (x_train, x_test, y_train, y_test) = train_test_split(data, labels, test_size=0.2, stratify=labels)
+
+        print(x_train.shape, x_test.shape)
+
 
     def dnw(self):
         pass
