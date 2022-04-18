@@ -82,6 +82,7 @@ class WindowClass(QMainWindow):
         self.actionOpen.triggered.connect(self.videoopen)
 
 # 비디오 재생관리
+
     def video(self, image):
         self.videoLb.setPixmap(QPixmap.fromImage(image).scaled(self.videoLb.size(), Qt.KeepAspectRatio))
 
@@ -158,6 +159,17 @@ class WindowClass(QMainWindow):
                                     pass
                 print("Get person img finish")
 
+    def load_dataset(self, path):
+        data = []
+        img_list = os.listdir(path)
+
+        for i in range(len(img_list)):
+            img = load_img(path + img_list[i], target_size=(128, 128))
+            img = img_to_array(img)
+            img = preprocess_input(img)
+            data.append(img)
+        return data
+
     def learning(self):
         # print(len(os.listdir('./person_imgs')))
 
@@ -178,34 +190,38 @@ class WindowClass(QMainWindow):
         model.add(Dense(6, activation='softmax')) # number of classes = 6
         model.summary()
 
+        generator = ImageDataGenerator(horizontal_flip=True, zoom_range=0.1, fill_mode="nearest")
+        INIT_LR = 1e-4
+        EPOCHS = 30
+        opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
+        model.compile(loss="categorical_crossentropy", optimizer=opt, metrics=["accuracy"])
+        ckp = ModelCheckpoint('./best_model.h5', save_best_only=True, monitor='val_accuracy')
+
         PATH = './person_imgs/'
-        img_list = os.listdir(PATH)
-        # print(len(img_list))
+        class_list = os.listdir(PATH)
+        # print(len(class_list))
         labels = []
-        DATA = []
-
-
-        for i in range(len(img_list)):
-            img = load_img(PATH + img_list[i], target_size=(128, 128))
-            img = img_to_array(img)
-            img = preprocess_input(img)
-            DATA.append(img)
-
         data = np.array([])
-        for i in range(len(img_list)):
-            data_folder = data
+
+        for i in range(len(class_list)):
+            data_folder = self.load_dataset(PATH + class_list[i])
             data = np.append(data, data_folder)
-            label = len(data_folder) * [img_list[i]]
+            label = len(data_folder) * [class_list[i]]
             labels.extend(label)
 
         data = data.reshape(-1, 128, 128, 3)
         lb = LabelEncoder()
+        print(labels)
         labels = lb.fit_transform(labels)
         labels = to_categorical(labels)
 
         (x_train, x_test, y_train, y_test) = train_test_split(data, labels, test_size=0.2, stratify=labels)
 
         print(x_train.shape, x_test.shape)
+
+        model.fit(generator.flow(x_train, y_train, batch_size=32), steps_per_epoch=len(x_train) // 32,
+            epochs=EPOCHS, validation_data=(x_test, y_test), validation_steps=len(x_test) // 32, callbacks=[ckp])
+
 
 
     def dnw(self):
