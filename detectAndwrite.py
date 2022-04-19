@@ -87,7 +87,7 @@ class WindowClass(QMainWindow):
                 global writer
                 fps = 29.97
                 fourcc = cv2.VideoWriter_fourcc(*'DIVX')
-                writer = cv2.VideoWriter(source + '_detecting.avi', fourcc, fps, (1280, 720))
+                writer = cv2.VideoWriter(source + '_detecting.avi', fourcc, fps, (640, 360))
 
                 weight = './yolov3.weights'
                 cfg = './yolov3.cfg'
@@ -102,7 +102,7 @@ class WindowClass(QMainWindow):
                 vid = cv2.VideoCapture(source)
                 while vid:
                     ret, img = vid.read()
-                    i = 0
+                    j = 0
                     if ret:
                         # try:
                         #     prop = cv2.cv.CV_CAP_PROP_FRAME_COUNT if imutils.is_cv2() \
@@ -124,7 +124,6 @@ class WindowClass(QMainWindow):
                         blob = cv2.dnn.blobFromImage(img, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
                         net.setInput(blob)
                         outs = net.forward(output_layers)
-
                         class_ids = []
                         confidences = []
                         boxes = []
@@ -158,10 +157,9 @@ class WindowClass(QMainWindow):
                                 cv2.rectangle(img, (x, y), (x + w, y + h), color, 2)
                                 cv2.putText(img, label, (x, y - 10), font, 1, color, 3)
 
-                        print(img.shape)
                         writer.write(img)
-                        print(i, "1111")
-                        print("[INFO] {} total frames in video {}/{}".format(total, i, total))
+                        j += 1
+                        print("[INFO] {} total frames in video {}/{}".format(total, j, total))
                 writer.release()
                 exit()
 

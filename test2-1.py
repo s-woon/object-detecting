@@ -23,6 +23,8 @@ from tensorflow.keras.utils import to_categorical
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 
+from imutils import paths
+
 save_dir = './video'
 
 class Thread(QThread):
@@ -187,42 +189,60 @@ class WindowClass(QMainWindow):
         model.add(BatchNormalization())
         model.add(Dense(256, activation='relu'))
         model.add(BatchNormalization())
-        model.add(Dense(6, activation='softmax')) # number of classes = 6
+        model.add(Dense(3, activation='softmax')) # number of classes = 6
         model.summary()
 
         generator = ImageDataGenerator(horizontal_flip=True, zoom_range=0.1, fill_mode="nearest")
         INIT_LR = 1e-4
         EPOCHS = 30
-        opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
+        opt = Adam(learning_rate=INIT_LR, decay=INIT_LR / EPOCHS)
         model.compile(loss="categorical_crossentropy", optimizer=opt, metrics=["accuracy"])
         ckp = ModelCheckpoint('./best_model.h5', save_best_only=True, monitor='val_accuracy')
 
-        PATH = './person_imgs/'
-        class_list = os.listdir(PATH)
-        # print(len(class_list))
+        base = os.getcwd()
+        ds_path = os.path.join("./person_imgs")
+
+        imagePaths = list(paths.list_images(ds_path))
         labels = []
-        data = np.array([])
+        data = []
+        labels_origin = []
+        print(imagePaths)
 
-        for i in range(len(class_list)):
-            data_folder = self.load_dataset(PATH + class_list[i])
-            data = np.append(data, data_folder)
-            label = len(data_folder) * [class_list[i]]
-            labels.extend(label)
+        # PATH = './person_imgs/'
+        # class_list = os.listdir(PATH)
+        # # print(len(class_list))
+        # labels = []
+        # data = np.array([])
 
-        data = data.reshape(-1, 128, 128, 3)
+        for imagePath in imagePaths:
+            # extract the class label from the filename
+            label = imagePath.split(os.path.sep)[-2]
+
+            # 다 keras 기반 함수들 load_img -> img_to_arrary -> preprocess_input
+            image = load_img(imagePath, target_size=(224, 224))  # resizing
+            image = img_to_array(image)  # numpy array로 변환
+            image = preprocess_input(
+                image)  # compatible 한 전처리를 위해 위의 load_img랑 세트 ,mobilnetv2만을 위한 preprocess class # 픽셀값들이 샘플별로 -1 ~ 1로 스케일링
+
+            # update the data and labels lists, respectively
+            data.append(image)
+            labels_origin.append(label)
+
+        data = np.array(data, dtype="float32")
+        labels_origin = np.array(labels_origin)
+        print(labels_origin)
+
         lb = LabelEncoder()
-        print(labels)
-        labels = lb.fit_transform(labels)
+        labels = lb.fit_transform(labels_origin)
         labels = to_categorical(labels)
+
+        print(data.shape)
+        print(labels.shape)
 
         (x_train, x_test, y_train, y_test) = train_test_split(data, labels, test_size=0.2, stratify=labels)
 
-        print(x_train.shape, x_test.shape)
-
-        model.fit(generator.flow(x_train, y_train, batch_size=32), steps_per_epoch=len(x_train) // 32,
-            epochs=EPOCHS, validation_data=(x_test, y_test), validation_steps=len(x_test) // 32, callbacks=[ckp])
-
-
+        model.fit(generator.flow(x_train, y_train, batch_size=32), steps_per_epoch=len(x_train) // 32, epochs=EPOCHS,
+            validation_data=(x_test, y_test), validation_steps=len(x_test) // 32, callbacks=[ckp])
 
     def dnw(self):
         pass
