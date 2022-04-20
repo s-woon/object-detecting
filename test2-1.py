@@ -250,10 +250,10 @@ class WindowClass(QMainWindow):
     def progress_function(self, stream, chunk, bytes_remaining):
         size = self.video.filesize
         progress = ((float(abs(bytes_remaining - size) / size)) * float(100))
-        self.progressBar.setValue(progress)
-        if self.progressBar.value() == 100:
+        self.downloadbar.setValue(progress)
+        if self.downloadbar.value() == 100:
             QMessageBox.warning(self, '완료', '동영상파일 다운로드 완료!  ')
-            self.progressBar.setValue(0)
+            self.downloadbar.setValue(0)
 
     def videosave(self):
         source = self.downurl.text()

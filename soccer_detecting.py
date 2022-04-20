@@ -12,27 +12,27 @@ from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog, QMessageBox,
 from PyQt5.uic import loadUi
 from pytube import YouTube
 
-from object_detection.utils import label_map_util
-from object_detection.utils import visualization_utils as vis_util
+# from object_detection.utils import label_map_util
+# from object_detection.utils import visualization_utils as vis_util
 
-sys.path.append("..")
-PATH_TO_CKPT = './model/frozen_inference_graph.pb'
-PATH_TO_LABELS = './data/mscoco_label_map.pbtxt'
+# sys.path.append("..")
+# PATH_TO_CKPT = './model/frozen_inference_graph.pb'
+# PATH_TO_LABELS = './data/mscoco_label_map.pbtxt'
+#
+# NUM_CLASSES = 90
+#
+# detection_graph = tf.compat.v1.Graph()
+# with detection_graph.as_default():
+#     od_graph_def = tf.compat.v1.GraphDef()
+#     with tf.io.gfile.GFile(PATH_TO_CKPT, 'rb') as fid:
+#         serialized_graph = fid.read()
+#         od_graph_def.ParseFromString(serialized_graph)
+#         tf.import_graph_def(od_graph_def, name='')
 
-NUM_CLASSES = 90
-
-detection_graph = tf.compat.v1.Graph()
-with detection_graph.as_default():
-    od_graph_def = tf.compat.v1.GraphDef()
-    with tf.io.gfile.GFile(PATH_TO_CKPT, 'rb') as fid:
-        serialized_graph = fid.read()
-        od_graph_def.ParseFromString(serialized_graph)
-        tf.import_graph_def(od_graph_def, name='')
-
-label_map = label_map_util.load_labelmap(PATH_TO_LABELS)
-categories = label_map_util.convert_label_map_to_categories(label_map, max_num_classes=NUM_CLASSES,
-                                                            use_display_name=True)
-category_index = label_map_util.create_category_index(categories)
+# label_map = label_map_util.load_labelmap(PATH_TO_LABELS)
+# categories = label_map_util.convert_label_map_to_categories(label_map, max_num_classes=NUM_CLASSES,
+#                                                             use_display_name=True)
+# category_index = label_map_util.create_category_index(categories)
 
 save_dir = './video'
 
@@ -143,6 +143,20 @@ class WindowClass(QMainWindow):
     def video(self, image):
         self.videoLb.setPixmap(QPixmap.fromImage(image).scaled(self.videoLb.size(), Qt.KeepAspectRatio))
 
+    def colorfinder(self, color):
+        if color == 'Red':
+            lower = [17, 15, 100]
+            upper = [50, 56, 200]
+            lower = np.array(lower, dtype="uint8")
+            upper = np.array(upper, dtype="uint8")
+        else:
+            lower = [25, 146, 190]
+            upper = [96, 174, 250]
+            lower = np.array(lower, dtype="uint8")
+            upper = np.array(upper, dtype="uint8")
+
+        return lower, upper
+
     def detectstart(self):
         global source
         if self.lbox.currentItem() == None:
@@ -156,17 +170,28 @@ class WindowClass(QMainWindow):
                 global writer
                 fps = 29.97
                 fourcc = cv2.VideoWriter_fourcc(*'DIVX')
-                writer = cv2.VideoWriter(source + '_detecting.avi', fourcc, fps, (640, 360))
+                # writer = cv2.VideoWriter(source + '_detecting.avi', fourcc, fps, (640, 360))
+                t1name = self.t1namelb.text()
+                t2name = self.t2namelb.text()
+                t1color = str(self.t1colorbox.currentText())
+                t2color = str(self.t2colorbox.currentText())
 
-                vid = cv2.VideoCapture(source)
-                while vid:
-                    ret, image_np = vid.read()
-                    if ret:
-                        h = image_np.shape[0]
-                        w = image_np.shape[1]
+                t1color = self.colorfinder(t1color)
+                t2color = self.colorfinder(t2color)
 
-                    if not ret:
-                        break
+                print(t1color)
+                print(t2color)
+
+
+                # vid = cv2.VideoCapture(source)
+                # while vid:
+                #     ret, image_np = vid.read()
+                #     if ret:
+                #         h = image_np.shape[0]
+                #         w = image_np.shape[1]
+                #
+                #     if not ret:
+                #         break
 
     def nparr2qimg(self, cvimg):
         ''' convert cv2 bgr image -> rgb qimg '''
@@ -178,10 +203,10 @@ class WindowClass(QMainWindow):
     def progress_function(self, stream, chunk, bytes_remaining):
         size = self.video.filesize
         progress = ((float(abs(bytes_remaining - size) / size)) * float(100))
-        self.progressBar.setValue(progress)
-        if self.progressBar.value() == 100:
+        self.downloadbar.setValue(progress)
+        if self.downloadbar.value() == 100:
             QMessageBox.warning(self, '완료', '동영상파일 다운로드 완료!  ')
-            self.progressBar.setValue(0)
+            self.downloadbar.setValue(0)
 
     def videosave(self):
         source = self.downurl.text()
