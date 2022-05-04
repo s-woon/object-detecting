@@ -28,7 +28,7 @@
    <property name="title">
     <string>TEAM1</string>
    </property>
-   <widget class="QLabel" name="t1name">
+   <widget class="QLabel" name="tname">
     <property name="geometry">
      <rect>
       <x>10</x>
@@ -44,7 +44,7 @@
      <string>NAME</string>
     </property>
    </widget>
-   <widget class="QLineEdit" name="t1nameLE">
+   <widget class="QLineEdit" name="tnameLE">
     <property name="geometry">
      <rect>
       <x>160</x>
@@ -57,7 +57,7 @@
      <string/>
     </property>
    </widget>
-   <widget class="QLabel" name="t1color">
+   <widget class="QLabel" name="tcolor">
     <property name="geometry">
      <rect>
       <x>10</x>
@@ -73,7 +73,7 @@
      <string>Uniform Color</string>
     </property>
    </widget>
-   <widget class="QLabel" name="t1pictureLb">
+   <widget class="QLabel" name="tpictureLb">
     <property name="geometry">
      <rect>
       <x>10</x>
@@ -102,7 +102,7 @@
      <string>...</string>
     </property>
    </widget>
-   <widget class="QLineEdit" name="t1colorLE">
+   <widget class="QLineEdit" name="tcolorLE">
     <property name="geometry">
      <rect>
       <x>180</x>
@@ -115,7 +115,7 @@
      <string/>
     </property>
    </widget>
-   <widget class="QLabel" name="t1color_2">
+   <widget class="QLabel" name="tcolor_2">
     <property name="geometry">
      <rect>
       <x>10</x>
