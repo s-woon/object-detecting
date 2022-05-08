@@ -221,11 +221,11 @@ def get_person_imgs(img, net, conf_t, nms_t, path):
             except:
                 pass
 
-# for i in range(150):
-#     success, img = getFrame(60 + i*2, './videos/[2021 PL 10R] S햄튼 vs 맨유 HL.mp4')
-#     if success:
-#         path = './person_imgs/' + 'video1_frame' + '_' + str(i) + '_'
-#         get_person_imgs(img, net, 0.3, 0.4, path)
+for i in range(150):
+    success, img = getFrame(60 + i*2, './videos/[2021 PL 10R] S햄튼 vs 맨유 HL.mp4')
+    if success:
+        path = './person_imgs/' + 'video1_frame' + '_' + str(i) + '_'
+        get_person_imgs(img, net, 0.3, 0.4, path)
 #
 # for i in range(150):
 #     success, img = getFrame(60 + i*2, './videos/[2021 PL 27R] 맨시티 vs 맨유 HL.mp4')

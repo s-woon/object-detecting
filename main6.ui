@@ -147,7 +147,7 @@
       <x>740</x>
       <y>50</y>
       <width>291</width>
-      <height>201</height>
+      <height>121</height>
      </rect>
     </property>
     <property name="styleSheet">
@@ -188,22 +188,6 @@
       <bool>true</bool>
      </property>
     </widget>
-    <widget class="QLabel" name="t1colorLB">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>110</y>
-       <width>271</width>
-       <height>31</height>
-      </rect>
-     </property>
-     <property name="styleSheet">
-      <string notr="true"/>
-     </property>
-     <property name="text">
-      <string>TEAM1 Uniform Color Number</string>
-     </property>
-    </widget>
     <widget class="QPushButton" name="t1settingBtn">
      <property name="geometry">
       <rect>
@@ -215,22 +199,6 @@
      </property>
      <property name="text">
       <string>setting</string>
-     </property>
-    </widget>
-    <widget class="QLineEdit" name="t1colorLE">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>150</y>
-       <width>271</width>
-       <height>31</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string/>
-     </property>
-     <property name="readOnly">
-      <bool>true</bool>
      </property>
     </widget>
    </widget>
@@ -279,7 +247,7 @@
       <x>1040</x>
       <y>50</y>
       <width>291</width>
-      <height>201</height>
+      <height>121</height>
      </rect>
     </property>
     <property name="styleSheet">
@@ -320,22 +288,6 @@
       <bool>true</bool>
      </property>
     </widget>
-    <widget class="QLabel" name="t2colorLB">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>110</y>
-       <width>271</width>
-       <height>31</height>
-      </rect>
-     </property>
-     <property name="styleSheet">
-      <string notr="true"/>
-     </property>
-     <property name="text">
-      <string>TEAM2 Uniform Color Number</string>
-     </property>
-    </widget>
     <widget class="QPushButton" name="t2settingBtn">
      <property name="geometry">
       <rect>
@@ -347,22 +299,6 @@
      </property>
      <property name="text">
       <string>setting</string>
-     </property>
-    </widget>
-    <widget class="QLineEdit" name="t2colorLE">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>150</y>
-       <width>271</width>
-       <height>31</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string/>
-     </property>
-     <property name="readOnly">
-      <bool>true</bool>
      </property>
     </widget>
    </widget>

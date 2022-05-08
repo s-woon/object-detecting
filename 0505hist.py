@@ -77,7 +77,7 @@ class Thread(QThread):
 class WindowClass(QMainWindow):
     def __init__(self):
         super(WindowClass, self).__init__()
-        loadUi('main5.ui', self)
+        loadUi('main6.ui', self)
         self.th = Thread(self)
         self.i = 0
 
@@ -102,25 +102,17 @@ class WindowClass(QMainWindow):
         dlg = t1SettingDialog()
         dlg.exec_()
         self.t1name = dlg.tname
-        self.t1color = dlg.tcolor
-
-        self.t1lowerhsv = dlg.lowerhsv
-        self.t1upperhsv = dlg.upperhsv
+        self.t1hist = dlg.t1hist
 
         self.t1nameLE.setText(self.t1name)
-        self.t1colorLE.setText(self.t1color)
 
     def t2setting(self):
         dlg = t2SettingDialog()
         dlg.exec_()
         self.t2name = dlg.tname
-        self.t2color = dlg.tcolor
-
-        self.t2lowerhsv = dlg.lowerhsv
-        self.t2upperhsv = dlg.upperhsv
+        self.t2hist = dlg.t2hist
 
         self.t2nameLE.setText(self.t2name)
-        self.t2colorLE.setText(self.t2color)
 
 # 비디오 재생관리
     def video(self, image):
@@ -273,7 +265,7 @@ class WindowClass(QMainWindow):
                                 histogram = np.concatenate(hists)
                                 histogram = cv2.normalize(histogram, histogram)
 
-                                print(histogram)
+
 
                     cv2.imshow('aaa', frame)
                     if cv2.waitKey(10) & 0xFF == ord('q'):
@@ -334,7 +326,7 @@ class WindowClass(QMainWindow):
 class t1SettingDialog(QDialog):
     def __init__(self):
         super(t1SettingDialog, self).__init__()
-        loadUi('dialog.ui', self)
+        loadUi('dialog2.ui', self)
 
         self.saveBtn.clicked.connect(self.save)
         self.cancelBtn.clicked.connect(self.cancel)
@@ -343,82 +335,37 @@ class t1SettingDialog(QDialog):
 
     def save(self):
         self.tname = self.tnameLE.text()
-        self.tcolor = self.tcolorLE.text()
         self.close()
 
     def cancel(self):
         self.tname = None
-        self.tcolor = None
         self.close()
-
-    def mousePressEvent(self, e):
-        if e.buttons():
-
-            screen = ImageGrab.grab()
-            rgb = screen.getpixel(pyautogui.position())
-
-            pixel = np.uint8([[rgb]])
-            t1hsv = cv2.cvtColor(pixel, cv2.COLOR_RGB2HSV)
-            hsv = t1hsv[0][0]
-
-            # HSV 색공간에서 마우스 클릭으로 얻은 픽셀값과 유사한 필셀값의 범위를 정합니다.
-            if hsv[0] < 10:
-                print("case1")
-                lower1 = np.array([hsv[0] - 10 + 180, 30, 30])
-                upper1 = np.array([180, 255, 255])
-                lower2 = np.array([0, 30, 30])
-                upper2 = np.array([hsv[0], 255, 255])
-                lower3 = np.array([hsv[0], 30, 30])
-                upper3 = np.array([hsv[0] + 10, 255, 255])
-                #     print(i-10+180, 180, 0, i)
-                #     print(i, i+10)
-                self.lowerhsv = lower3
-                self.upperhsv = upper1
-
-            elif hsv[0] > 170:
-                print("case2")
-                lower1 = np.array([hsv[0], 30, 30])
-                upper1 = np.array([180, 255, 255])
-                lower2 = np.array([0, 30, 30])
-                upper2 = np.array([hsv[0] + 10 - 180, 255, 255])
-                lower3 = np.array([hsv[0] - 10, 30, 30])
-                upper3 = np.array([hsv[0], 255, 255])
-                #     print(i, 180, 0, i+10-180)
-                #     print(i-10, i)
-                self.lowerhsv = lower3
-                self.upperhsv = upper1
-
-            else:
-                print("case3")
-                lower1 = np.array([hsv[0], 30, 30])
-                upper1 = np.array([hsv[0] + 10, 255, 255])
-                lower2 = np.array([hsv[0] - 10, 30, 30])
-                upper2 = np.array([hsv[0], 255, 255])
-                lower3 = np.array([hsv[0] - 10, 30, 30])
-                upper3 = np.array([hsv[0], 255, 255])
-                #     print(i, i+10)
-                #     print(i-10, i)
-                self.lowerhsv = lower3
-                self.upperhsv = upper1
-
-            print(self.lowerhsv, self.upperhsv, 'lower, upper')
-            self.tcolorLE.setText(str(self.lowerhsv))
-
 
     def selectpicture(self):
         filename = QFileDialog.getOpenFileName(self)
         filesource = filename[0]
         self.img_color = cv2.imread(filesource)
-        image = cv2.cvtColor(self.img_color, cv2.COLOR_BGR2RGB)
-        image = QImage(image.data, image.shape[1], image.shape[0], QImage.Format_RGB888)
+        img = cv2.cvtColor(self.img_color, cv2.COLOR_BGR2RGB)
+        image = QImage(img.data, img.shape[1], img.shape[0], QImage.Format_RGB888)
         self.tpictureLb.setPixmap(QPixmap.fromImage(image).scaled(self.tpictureLb.size(), Qt.KeepAspectRatio))
+
+        hists = []
+
+        img = cv2.resize(img, dsize=(50, 100), interpolation=cv2.INTER_LINEAR)
+        bgr = ['b', 'g', 'r']
+        for i in range(len(bgr)):
+            hist = cv2.calcHist([img], [i], None, [4], [0, 256])
+            hists.append(hist)
+
+        histogram = np.concatenate(hists)
+        self.t1hist = cv2.normalize(histogram, histogram)
 
 
 ''' t2 Dialog '''
 class t2SettingDialog(QDialog):
     def __init__(self):
         super(t2SettingDialog, self).__init__()
-        loadUi('dialog.ui', self)
+        loadUi('dialog2.ui', self)
 
         self.saveBtn.clicked.connect(self.save)
         self.cancelBtn.clicked.connect(self.cancel)
@@ -427,73 +374,31 @@ class t2SettingDialog(QDialog):
 
     def save(self):
         self.tname = self.tnameLE.text()
-        self.tcolor = self.tcolorLE.text()
         self.close()
 
     def cancel(self):
         self.tname = None
-        self.tcolor = None
         self.close()
-
-    def mousePressEvent(self, e):
-        if e.buttons():
-            screen = ImageGrab.grab()
-            rgb = screen.getpixel(pyautogui.position())
-
-            pixel = np.uint8([[rgb]])
-            t1hsv = cv2.cvtColor(pixel, cv2.COLOR_RGB2HSV)
-            hsv = t1hsv[0][0]
-
-            # HSV 색공간에서 마우스 클릭으로 얻은 픽셀값과 유사한 필셀값의 범위를 정합니다.
-            if hsv[0] < 10:
-                print("case1")
-                lower1 = np.array([hsv[0] - 10 + 180, 30, 30])
-                upper1 = np.array([180, 255, 255])
-                lower2 = np.array([0, 30, 30])
-                upper2 = np.array([hsv[0], 255, 255])
-                lower3 = np.array([hsv[0], 30, 30])
-                upper3 = np.array([hsv[0] + 10, 255, 255])
-                #     print(i-10+180, 180, 0, i)
-                #     print(i, i+10)
-                self.lowerhsv = lower3
-                self.upperhsv = upper1
-
-            elif hsv[0] > 170:
-                print("case2")
-                lower1 = np.array([hsv[0], 30, 30])
-                upper1 = np.array([180, 255, 255])
-                lower2 = np.array([0, 30, 30])
-                upper2 = np.array([hsv[0] + 10 - 180, 255, 255])
-                lower3 = np.array([hsv[0] - 10, 30, 30])
-                upper3 = np.array([hsv[0], 255, 255])
-                #     print(i, 180, 0, i+10-180)
-                #     print(i-10, i)
-                self.lowerhsv = lower3
-                self.upperhsv = upper1
-
-            else:
-                print("case3")
-                lower1 = np.array([hsv[0], 30, 30])
-                upper1 = np.array([hsv[0] + 10, 255, 255])
-                lower2 = np.array([hsv[0] - 10, 30, 30])
-                upper2 = np.array([hsv[0], 255, 255])
-                lower3 = np.array([hsv[0] - 10, 30, 30])
-                upper3 = np.array([hsv[0], 255, 255])
-                #     print(i, i+10)
-                #     print(i-10, i)
-                self.lowerhsv = lower3
-                self.upperhsv = upper1
-
-            print(self.lowerhsv, self.upperhsv, 'lower, upper')
-            self.tcolorLE.setText(str(self.lowerhsv))
 
     def selectpicture(self):
         filename = QFileDialog.getOpenFileName(self)
         filesource = filename[0]
         self.img_color = cv2.imread(filesource)
-        image = cv2.cvtColor(self.img_color, cv2.COLOR_BGR2RGB)
-        image = QImage(image.data, image.shape[1], image.shape[0], QImage.Format_RGB888)
+        img = cv2.cvtColor(self.img_color, cv2.COLOR_BGR2RGB)
+        image = QImage(img.data, img.shape[1], img.shape[0], QImage.Format_RGB888)
         self.tpictureLb.setPixmap(QPixmap.fromImage(image).scaled(self.tpictureLb.size(), Qt.KeepAspectRatio))
+
+        hists = []
+
+        img = cv2.resize(img, dsize=(50, 100), interpolation=cv2.INTER_LINEAR)
+        bgr = ['b', 'g', 'r']
+        for i in range(len(bgr)):
+            hist = cv2.calcHist([img], [i], None, [4], [0, 256])
+            hists.append(hist)
+
+        histogram = np.concatenate(hists)
+        self.t2hist = cv2.normalize(histogram, histogram)
+
 
 if __name__ == "__main__" :
     app = QApplication(sys.argv)
