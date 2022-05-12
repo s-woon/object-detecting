@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog, QMessageBox,
 from PyQt5.uic import loadUi
 from pytube import YouTube
 
-from history import readyolo
+import readyolo
 
 hsv = 0
 
@@ -24,7 +24,7 @@ net = cv2.dnn.readNet(weight, cfg)
 layer_names = net.getLayerNames()
 output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
 classes = None
-with open('./yolov3.txt', 'r') as f:
+with open('../yolov3.txt', 'r') as f:
     classes = [line.strip() for line in f.readlines()]
 
 boxes = []
@@ -137,7 +137,7 @@ class WindowClass(QMainWindow):
 
     def getFrame(self, sec, video_path):
         video = cv2.VideoCapture(video_path)
-        video.set(cv2.CAP_PROP_POS_MSEC, sec * 1000)
+        video.set(cv2.CAP_PROP_POS_MSEC, sec)
         hasFrames, image = video.read()
         return hasFrames, image
 
@@ -193,7 +193,7 @@ class WindowClass(QMainWindow):
                 QMessageBox.warning(self, '오류', '재생할 동영상 파일이 선택되지 않았습니다.  ')
             else:
                 for i in range(30):
-                    success, img = self.getFrame(60 + i * 2, source)
+                    success, img = self.getFrame(0 + i * 2, source)
                     if success:
                         self.createDirectory('./person_imgs/')
                         path = './person_imgs/' + 'video1_frame' + '_' + str(i) + '_'
@@ -244,17 +244,17 @@ class WindowClass(QMainWindow):
                                     img = cv2.resize(crop_img, dsize=(50, 100), interpolation=cv2.INTER_LINEAR)
                                 except Exception as e:
                                     print(str(e))
+                                hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-                                for i in range(3):
-                                    hist = cv2.calcHist([img], [i], None, [4], [0, 256])
-                                    hists.append(hist)
+                                hist = cv2.calcHist([hsv], [0, 1], None, [360, 256], [0, 360, 0, 256])
+                                hists.append(hist)
 
                                 histogram = np.concatenate(hists)
-                                histogram = cv2.normalize(histogram, histogram)
+                                histogram = cv2.normalize(histogram, histogram, 0, 1, cv2.NORM_MINMAX)
 
                                 compare = cv2.compareHist(histogram, self.t1hist, cv2.HISTCMP_CHISQR)
                                 print(compare, 'compare')
-                                if compare < int(8):
+                                if compare > int(60):
                                     cv2.putText(frame, self.t1name, (x - 2, y - 2),
                                                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 1,
                                                 cv2.LINE_AA)
@@ -265,7 +265,7 @@ class WindowClass(QMainWindow):
                                                 cv2.LINE_AA)
                                     cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 1)
 
-                    cv2.imshow('Detecting', frame)
+                    cv2.imshow('aaa', frame)
                     writer.write(frame)
                     if cv2.waitKey(10) & 0xFF == ord('q'):
                         cv2.destroyAllWindows()
@@ -352,13 +352,14 @@ class t1SettingDialog(QDialog):
         hists = []
 
         img = cv2.resize(img, dsize=(50, 100), interpolation=cv2.INTER_LINEAR)
-        for i in range(3):
-            hist = cv2.calcHist([img], [i], None, [4], [0, 256])
-            hists.append(hist)
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+        hist = cv2.calcHist([hsv], [0, 1], None, [360, 256], [0, 360, 0, 256])
+        hists.append(hist)
 
         histogram = np.concatenate(hists)
         self.t1image = image
-        self.t1hist = cv2.normalize(histogram, histogram)
+        self.t1hist = cv2.normalize(histogram, histogram, 0, 1, cv2.NORM_MINMAX)
 
 
 ''' t2 Dialog '''
@@ -391,13 +392,14 @@ class t2SettingDialog(QDialog):
         hists = []
 
         img = cv2.resize(img, dsize=(50, 100), interpolation=cv2.INTER_LINEAR)
-        for i in range(3):
-            hist = cv2.calcHist([img], [i], None, [4], [0, 256])
-            hists.append(hist)
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+        hist = cv2.calcHist([hsv], [0, 1], None, [360, 256], [0, 360, 0, 256])
+        hists.append(hist)
 
         histogram = np.concatenate(hists)
         self.t2image = image
-        self.t2hist = cv2.normalize(histogram, histogram)
+        self.t2hist = cv2.normalize(histogram, histogram, 0, 1, cv2.NORM_MINMAX)
 
 
 if __name__ == "__main__" :

@@ -5,7 +5,7 @@ import numpy as np
 net = cv2.dnn.readNet("./yolov3.weights", "./yolov3.cfg")
 
 classes = []
-with open("./yolov3.txt", "r") as f:
+with open("../yolov3.txt", "r") as f:
     classes = [line.strip() for line in f.readlines()]
 colors = np.random.uniform(0, 255, size=(len(classes), 3))
 

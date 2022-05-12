@@ -98,7 +98,7 @@ class WindowClass(QMainWindow):
                 QMessageBox.warning(self, '오류', '재생할 동영상 파일이 선택되지 않았습니다.  ')
             else:
                 print("Get person img start")
-                PATH = './person_imgs'
+                PATH = '../person_imgs'
 
                 try:
                     if not os.path.exists(PATH):
@@ -110,7 +110,7 @@ class WindowClass(QMainWindow):
                 cfg = './yolov3.cfg'
                 net = cv2.dnn.readNet(weight, cfg)
                 classes = None
-                with open('./yolov3.txt', 'r') as f:
+                with open('../yolov3.txt', 'r') as f:
                     classes = [line.strip() for line in f.readlines()]
 
                 for i in range(150):
@@ -200,7 +200,7 @@ class WindowClass(QMainWindow):
         ckp = ModelCheckpoint('./best_model.h5', save_best_only=True, monitor='val_accuracy')
 
         base = os.getcwd()
-        ds_path = os.path.join("./person_imgs")
+        ds_path = os.path.join("../person_imgs")
 
         imagePaths = list(paths.list_images(ds_path))
         labels = []

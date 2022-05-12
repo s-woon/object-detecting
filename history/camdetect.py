@@ -19,7 +19,7 @@ class Thread(QThread):
     global net
     net = cv2.dnn.readNet(weight, cfg)
     global classes
-    with open('./yolov3.txt', 'r') as f:
+    with open('../yolov3.txt', 'r') as f:
         classes = [line.strip() for line in f.readlines()]
 
     def run(self):

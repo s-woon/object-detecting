@@ -1,4 +1,4 @@
-import os
+
 import sys
 import cv2
 from time import sleep
@@ -15,27 +15,33 @@ from PIL import ImageColor
 import pyautogui
 from PIL import ImageGrab
 
-import readyolo
+import tensorflow as tf
+
+from object_detection.utils import label_map_util
+from object_detection.utils import visualization_utils as vis_util
 
 hsv = 0
 
 save_dir = './video'
 
-# YOLO 네트워크 불러오기
-weight = './yolov3.weights'
-cfg = './yolov3.cfg'
-net = cv2.dnn.readNet(weight, cfg)
+sys.path.append("../..")
+PATH_TO_CKPT = '../model/frozen_inference_graph.pb'
+PATH_TO_LABELS = '../data/mscoco_label_map.pbtxt'
 
-layer_names = net.getLayerNames()
-output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
-classes = None
-with open('./yolov3.txt', 'r') as f:
-    classes = [line.strip() for line in f.readlines()]
+NUM_CLASSES = 90
 
-boxes = []
-confidences = []
-conf_threshold = 0.3
-nms_threshold = 0.4
+detection_graph = tf.compat.v1.Graph()
+with detection_graph.as_default():
+    od_graph_def = tf.compat.v1.GraphDef()
+    with tf.io.gfile.GFile(PATH_TO_CKPT, 'rb') as fid:
+        serialized_graph = fid.read()
+        od_graph_def.ParseFromString(serialized_graph)
+        tf.import_graph_def(od_graph_def, name='')
+
+label_map = label_map_util.load_labelmap(PATH_TO_LABELS)
+categories = label_map_util.convert_label_map_to_categories(label_map, max_num_classes=NUM_CLASSES,
+                                                            use_display_name=True)
+category_index = label_map_util.create_category_index(categories)
 
 class Thread(QThread):
     changePixmap = pyqtSignal(QImage)
@@ -92,7 +98,7 @@ class WindowClass(QMainWindow):
         self.t1settingBtn.clicked.connect(self.t1setting)
         self.t2settingBtn.clicked.connect(self.t2setting)
 
-        self.croppersonBtn.clicked.connect(self.crop_personimg)
+        self.selectcolorBtn.clicked.connect(self.selectcolor)
 
         self.detectBtn.clicked.connect(self.detectstart)
 
@@ -122,6 +128,20 @@ class WindowClass(QMainWindow):
         self.t2nameLE.setText(self.t2name)
         self.t2colorLE.setText(self.t2color)
 
+    def nothing(self, x):
+        pass
+
+    def selectcolor(self):
+        filename = QFileDialog.getOpenFileName(self)
+        filesource = filename[0]
+
+        # cv2.setMouseCallback('img_color', self.mouse_callback)
+        self.img_color = cv2.imread(filesource)
+        image = cv2.cvtColor(self.img_color, cv2.COLOR_BGR2RGB)
+        image = QImage(image.data, image.shape[1], image.shape[0], QImage.Format_RGB888)
+        self.t1colorLb.setPixmap(QPixmap.fromImage(image).scaled(self.t1colorLb.size(), Qt.KeepAspectRatio))
+
+
 # 비디오 재생관리
     def video(self, image):
         self.videoLb.setPixmap(QPixmap.fromImage(image).scaled(self.videoLb.size(), Qt.KeepAspectRatio))
@@ -140,76 +160,40 @@ class WindowClass(QMainWindow):
         img must be a Numpy array with colour values along the last axis."""
         return img.any(axis=-1).sum()
 
-    def get_boxes_coordinate(self, boxes, confidences, conf_t, nms_t):
-        indices = cv2.dnn.NMSBoxes(boxes, confidences, conf_t, nms_t)
-        boxes = [boxes[i] for i in indices]
-        return [[x, y, x + w, y + h] for [x, y, w, h] in boxes]
+    def detect_team(self, image, show=False):
+        # define the list of boundaries
+        # print(self.lowerhsv, self.upperhsv, 'detect lower, upper')
+        boundaries = [
+            (self.t1lowerhsv, self.t1upperhsv),
+            (self.t2lowerhsv, self.t2upperhsv)
+        ]
+        i = 0
+        for (lower, upper) in boundaries:
+            # create NumPy arrays from the boundaries
+            lower = np.array(lower, dtype="uint8")
+            upper = np.array(upper, dtype="uint8")
 
-    def getFrame(self, sec, video_path):
-        video = cv2.VideoCapture(video_path)
-        video.set(cv2.CAP_PROP_POS_MSEC, sec * 1000)
-        hasFrames, image = video.read()
-        return hasFrames, image
+            # find the colors within the specified boundaries and apply
+            # the mask
+            mask = cv2.inRange(image, lower, upper)
+            output = cv2.bitwise_and(image, image, mask=mask)
+            tot_pix = self.count_nonblack_np(image)
+            color_pix = self.count_nonblack_np(output)
+            ratio = color_pix / tot_pix
+            print("ratio is:", ratio)
+            # print(self.t1color, self.t2color, 'self.t1color, self.t2color')
+            if ratio > 0.01 and i == 0:
+                return self.t1color
+            elif ratio > 0.01 and i == 1:
+                return self.t2color
 
-    def get_crop_img(self, img, boxes):
-        return [img[round(y1):round(y2), round(x1):round(x2)] for [x1, y1, x2, y2] in boxes]
+            i += 1
 
-    def get_person_imgs(self, img, net, conf_t, nms_t, path):
-        Width = img.shape[1]
-        Height = img.shape[0]
-
-        img_rescale = cv2.resize(img, (224, 224))
-        scale = 0.00392
-        blob = cv2.dnn.blobFromImage(img_rescale, scale, (416, 416), (0, 0, 0), True, crop=False)
-        net.setInput(blob)
-        outs = net.forward(output_layers)
-        for out in outs:
-            for detection in out:
-                scores = detection[5:]
-                class_id = np.argmax(scores)
-                if class_id == 0:
-                    confidence = scores[class_id]
-                    if confidence > conf_t:
-                        center_x = int(detection[0] * Width)
-                        center_y = int(detection[1] * Height)
-                        w = int(detection[2] * Width)
-                        h = int(detection[3] * Height)
-                        x = center_x - w / 2
-                        y = center_y - h / 2
-                        confidences.append(float(confidence))
-                        boxes.append([x, y, w, h])
-
-        box_fin = self.get_boxes_coordinate(boxes, confidences, conf_t, nms_t)
-        imgs = self.get_crop_img(img, box_fin)
-        if len(imgs) != 0:
-            for i in range(len(imgs)):
-                try:
-                    cv2.imwrite(path + str(i) + '.jpg', imgs[i])
-                except:
-                    pass
-
-    def createDirectory(self, directory):
-        try:
-            if not os.path.exists(directory):
-                os.makedirs(directory)
-        except OSError: print("Error: Failed to create the directory.")
-
-    def crop_personimg(self):
-        global source
-        if self.lbox.currentItem() == None:
-            QMessageBox.warning(self, '오류', '재생할 동영상 파일이 없습니다.  ')
-        else:
-            source = self.lbox.currentItem().text()
-            if source == '' or None:
-                QMessageBox.warning(self, '오류', '재생할 동영상 파일이 선택되지 않았습니다.  ')
-            else:
-                for i in range(30):
-                    success, img = self.getFrame(60 + i * 2, source)
-                    if success:
-                        self.createDirectory('./person_imgs/')
-                        path = './person_imgs/' + 'video1_frame' + '_' + str(i) + '_'
-                        self.get_person_imgs(img, net, conf_threshold, nms_threshold, path)
-                        print('video1_frame' + '_' + str(i) + '_')
+            if show == True:
+                cv2.imshow("images", np.hstack([image, output]))
+                if cv2.waitKey(0) & 0xFF == ord('q'):
+                    cv2.destroyAllWindows()
+        return 'not_sure'
 
     def detectstart(self):
         global source
@@ -225,60 +209,88 @@ class WindowClass(QMainWindow):
                 fps = 29.97
                 fourcc = cv2.VideoWriter_fourcc(*'DIVX')
                 # writer = cv2.VideoWriter(source + '_detecting.avi', fourcc, fps, (640, 360))
-                print(self.t1nameLE.text(), self.t2nameLE.text())
+
+                print(self.t1name, self.t2name)
+                # t2color = self.colorfinder(t2color)
                 global cap
-
-
-                # 클래스의 갯수만큼 랜덤 RGB 배열을 생성
-                COLORS = np.random.uniform(0, 255, size=(len(classes), 3))
-
-                # 영상 불러오기
                 cap = cv2.VideoCapture(source)
 
-                while cap.isOpened():
-                    ret, frame = cap.read()
-                    boxes, confidences, class_ids = readyolo.yolo(frame=frame, net=net, output_layers=output_layers)
+                with detection_graph.as_default():
+                    with tf.compat.v1.Session(graph=detection_graph) as sess:
+                        counter = 0
+                        while (True):
+                            ret, image_np = cap.read()
+                            counter += 1
+                            if ret:
+                                h = image_np.shape[0]
+                                w = image_np.shape[1]
 
-                    # 후보 박스(x, y, width, height)와 confidence(상자가 물체일 확률) 출력
-                    print(f"boxes: {boxes}")
-                    print(f"confidences: {confidences}")
+                            if not ret:
+                                break
+                            if counter % 1 == 0:
+                                # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
+                                image_np_expanded = np.expand_dims(image_np, axis=0)
+                                image_tensor = detection_graph.get_tensor_by_name('image_tensor:0')
+                                # Each box represents a part of the image where a particular object was detected.
+                                boxes = detection_graph.get_tensor_by_name('detection_boxes:0')
+                                # Each score represent how level of confidence for each of the objects.
+                                # Score is shown on the result image, together with the class label.
+                                scores = detection_graph.get_tensor_by_name('detection_scores:0')
+                                classes = detection_graph.get_tensor_by_name('detection_classes:0')
+                                num_detections = detection_graph.get_tensor_by_name('num_detections:0')
+                                # Actual detection.
+                                (boxes, scores, classes, num_detections) = sess.run(
+                                    [boxes, scores, classes, num_detections],
+                                    feed_dict={image_tensor: image_np_expanded})
+                                # Visualization of the results of a detection.
+                                vis_util.visualize_boxes_and_labels_on_image_array(
+                                    image_np,
+                                    np.squeeze(boxes),
+                                    np.squeeze(classes).astype(np.int32),
+                                    np.squeeze(scores),
+                                    category_index,
+                                    use_normalized_coordinates=True,
+                                    line_thickness=3,
+                                    min_score_thresh=0.6)
 
-                    # Non Maximum Suppression (겹쳐있는 박스 중 confidence 가 가장 높은 박스를 선택)
-                    indexes = cv2.dnn.NMSBoxes(boxes, confidences, score_threshold=0.4, nms_threshold=0.4)
+                                frame_number = counter
+                                loc = {}
+                                for n in range(len(scores[0])):
+                                    if scores[0][n] > 0.60:
+                                        # Calculate position
+                                        ymin = int(boxes[0][n][0] * h)
+                                        xmin = int(boxes[0][n][1] * w)
+                                        ymax = int(boxes[0][n][2] * h)
+                                        xmax = int(boxes[0][n][3] * w)
 
-                    # 후보 박스 중 선택된 박스의 인덱스 출력
-                    print(f"indexes: ", end='')
-                    for index in indexes:
-                        print(index, end=' ')
-                    print("\n\n============================== classes ==============================")
+                                        # Find label corresponding to that class
+                                        for cat in categories:
+                                            if cat['id'] == classes[0][n]:
+                                                label = cat['name'] # 여기까지 사람추출해내고 라벨에 person 대입
 
-                    for i in range(len(boxes)):
-                        if i in indexes:
-                            x, y, w, h = boxes[i]
-                            class_name = classes[class_ids[i]]
-                            label = f"{class_name} {confidences[i]:.2f}"
-                            color = COLORS[class_ids[i]]
+                                        ## extract every person
+                                        if label == 'person':
+                                            # crop them
+                                            crop_img = image_np[ymin:ymax, xmin:xmax]
+                                            color = self.detect_team(crop_img)
+                                            if color != 'not_sure':
+                                                coords = (xmin, ymin)
+                                                if color == self.t1color:
+                                                    loc[coords] = self.t1name
+                                                else:
+                                                    loc[coords] = self.t2name
 
-                            if class_name == 'person':
-                                # 사각형 테두리 그리기 및 텍스트 쓰기
-                                crop_img = frame[y:y+h, x:x+w]
-                                hists = []
-                                img = cv2.resize(crop_img, dsize=(50, 100), interpolation=cv2.INTER_LINEAR)
-                                # hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-                                bgr = ['b', 'g', 'r']
-                                for i in range(len(bgr)):
-                                    hist = cv2.calcHist([img], [i], None, [4], [0, 256])
-                                    hists.append(hist)
+                                ## print color next to the person
+                                for key in loc.keys():
+                                    text_pos = str(loc[key])
+                                    cv2.putText(image_np, text_pos, (key[0], key[1] - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.50, (255, 0, 0), 2)  # Text in black
 
-                                histogram = np.concatenate(hists)
-                                histogram = cv2.normalize(histogram, histogram)
+                            cv2.imshow('image', image_np)
 
-                                print(histogram)
-
-                    cv2.imshow('aaa', frame)
-                    if cv2.waitKey(10) & 0xFF == ord('q'):
-                        cv2.destroyAllWindows()
-                        cap.release()
+                            if cv2.waitKey(10) & 0xFF == ord('q'):
+                                cv2.destroyAllWindows()
+                                cap.release()
+                                break
 
 
     def nparr2qimg(self, cvimg):
@@ -356,53 +368,59 @@ class t1SettingDialog(QDialog):
 
             screen = ImageGrab.grab()
             rgb = screen.getpixel(pyautogui.position())
-
             pixel = np.uint8([[rgb]])
             t1hsv = cv2.cvtColor(pixel, cv2.COLOR_RGB2HSV)
             hsv = t1hsv[0][0]
 
             # HSV 색공간에서 마우스 클릭으로 얻은 픽셀값과 유사한 필셀값의 범위를 정합니다.
-            if hsv[0] < 10:
-                print("case1")
-                lower1 = np.array([hsv[0] - 10 + 180, 30, 30])
-                upper1 = np.array([180, 255, 255])
-                lower2 = np.array([0, 30, 30])
-                upper2 = np.array([hsv[0], 255, 255])
-                lower3 = np.array([hsv[0], 30, 30])
-                upper3 = np.array([hsv[0] + 10, 255, 255])
-                #     print(i-10+180, 180, 0, i)
-                #     print(i, i+10)
-                self.lowerhsv = lower3
-                self.upperhsv = upper1
+            # if hsv[0] < 10:
+            #     print("case1")
+            #     lower1 = np.array([hsv[0] - 10 + 180, 30, 30])
+            #     upper1 = np.array([180, 255, 255])
+            #     lower2 = np.array([0, 30, 30])
+            #     upper2 = np.array([hsv[0], 255, 255])
+            #     lower3 = np.array([hsv[0], 30, 30])
+            #     upper3 = np.array([hsv[0] + 10, 255, 255])
+            #     #     print(i-10+180, 180, 0, i)
+            #     #     print(i, i+10)
+            #     self.lowerhsv = lower3
+            #     self.upperhsv = upper1
+            #
+            # elif hsv[0] > 170:
+            #     print("case2")
+            #     lower1 = np.array([hsv[0], 30, 30])
+            #     upper1 = np.array([180, 255, 255])
+            #     lower2 = np.array([0, 30, 30])
+            #     upper2 = np.array([hsv[0] + 10 - 180, 255, 255])
+            #     lower3 = np.array([hsv[0] - 10, 30, 30])
+            #     upper3 = np.array([hsv[0], 255, 255])
+            #     #     print(i, 180, 0, i+10-180)
+            #     #     print(i-10, i)
+            #     self.lowerhsv = lower3
+            #     self.upperhsv = upper1
+            #
+            # else:
+            #     print("case3")
+            #     lower1 = np.array([hsv[0], 30, 30])
+            #     upper1 = np.array([hsv[0] + 10, 255, 255])
+            #     lower2 = np.array([hsv[0] - 10, 30, 30])
+            #     upper2 = np.array([hsv[0], 255, 255])
+            #     lower3 = np.array([hsv[0] - 10, 30, 30])
+            #     upper3 = np.array([hsv[0], 255, 255])
+            #     #     print(i, i+10)
+            #     #     print(i-10, i)
+            #     self.lowerhsv = lower3
+            #     self.upperhsv = upper1
+            self.lowerhsv = np.array([hsv[0]-10, 30, 30])
+            self.upperhsv = np.array([hsv[0]+10, 255, 255])
 
-            elif hsv[0] > 170:
-                print("case2")
-                lower1 = np.array([hsv[0], 30, 30])
-                upper1 = np.array([180, 255, 255])
-                lower2 = np.array([0, 30, 30])
-                upper2 = np.array([hsv[0] + 10 - 180, 255, 255])
-                lower3 = np.array([hsv[0] - 10, 30, 30])
-                upper3 = np.array([hsv[0], 255, 255])
-                #     print(i, 180, 0, i+10-180)
-                #     print(i-10, i)
-                self.lowerhsv = lower3
-                self.upperhsv = upper1
-
-            else:
-                print("case3")
-                lower1 = np.array([hsv[0], 30, 30])
-                upper1 = np.array([hsv[0] + 10, 255, 255])
-                lower2 = np.array([hsv[0] - 10, 30, 30])
-                upper2 = np.array([hsv[0], 255, 255])
-                lower3 = np.array([hsv[0] - 10, 30, 30])
-                upper3 = np.array([hsv[0], 255, 255])
-                #     print(i, i+10)
-                #     print(i-10, i)
-                self.lowerhsv = lower3
-                self.upperhsv = upper1
+            print(hsv[0], 'hsv[0]')
+            # print("@1", lower1, "~", upper1)
+            # print("@2", lower2, "~", upper2)
+            # print("@3", lower3, "~", upper3)
 
             print(self.lowerhsv, self.upperhsv, 'lower, upper')
-            self.tcolorLE.setText(str(self.lowerhsv))
+            self.tcolorLE.setText(str(hsv[0]))
 
 
     def selectpicture(self):
@@ -439,7 +457,6 @@ class t2SettingDialog(QDialog):
         if e.buttons():
             screen = ImageGrab.grab()
             rgb = screen.getpixel(pyautogui.position())
-
             pixel = np.uint8([[rgb]])
             t1hsv = cv2.cvtColor(pixel, cv2.COLOR_RGB2HSV)
             hsv = t1hsv[0][0]
@@ -484,8 +501,16 @@ class t2SettingDialog(QDialog):
                 self.lowerhsv = lower3
                 self.upperhsv = upper1
 
+            self.lowerhsv = np.array([hsv[0], 30, 30])
+            self.upperhsv = np.array([hsv[0], 255, 255])
+
+            print(hsv[0], 'hsv[0]')
+            # print("@1", lower1, "~", upper1)
+            # print("@2", lower2, "~", upper2)
+            # print("@3", lower3, "~", upper3)
+
             print(self.lowerhsv, self.upperhsv, 'lower, upper')
-            self.tcolorLE.setText(str(self.lowerhsv))
+            self.tcolorLE.setText(str(hsv[0]))
 
     def selectpicture(self):
         filename = QFileDialog.getOpenFileName(self)

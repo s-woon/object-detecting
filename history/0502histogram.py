@@ -10,6 +10,7 @@ from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog, QMessageBox, QColorDialog, QDialog
 from PyQt5.uic import loadUi
+from matplotlib import pyplot as plt
 from pytube import YouTube
 from PIL import ImageColor
 import pyautogui
@@ -24,9 +25,9 @@ hsv = 0
 
 save_dir = './video'
 
-sys.path.append("..")
-PATH_TO_CKPT = './model/frozen_inference_graph.pb'
-PATH_TO_LABELS = './data/mscoco_label_map.pbtxt'
+sys.path.append("../..")
+PATH_TO_CKPT = '../model/frozen_inference_graph.pb'
+PATH_TO_LABELS = '../data/mscoco_label_map.pbtxt'
 
 NUM_CLASSES = 90
 
@@ -42,6 +43,9 @@ label_map = label_map_util.load_labelmap(PATH_TO_LABELS)
 categories = label_map_util.convert_label_map_to_categories(label_map, max_num_classes=NUM_CLASSES,
                                                             use_display_name=True)
 category_index = label_map_util.create_category_index(categories)
+
+
+
 
 class Thread(QThread):
     changePixmap = pyqtSignal(QImage)
@@ -104,6 +108,18 @@ class WindowClass(QMainWindow):
 
         self.actionOpen.triggered.connect(self.videoopen)
 
+    def rangeFor(self, seg):
+        seg.sort()
+        rangeC = []
+        st = 0
+        for i in range(len(seg) - 1):
+            if (seg[i + 1] - seg[i] > 0.015):
+                rangeC.append([seg[st] - 0.005, seg[i] + 0.005])
+                st = i + 1
+        if st != len(seg) - 1 and len(seg) != 0:
+            rangeC.append([seg[st] - 0.005, seg[i] + 0.005])
+        return rangeC
+
     def t1setting(self):
         dlg = t1SettingDialog()
         dlg.exec_()
@@ -155,48 +171,53 @@ class WindowClass(QMainWindow):
         self.th.ndimg.disconnect(self.capture)
         self.i += 1
 
-    def count_nonblack_np(self, img):
-        """Return the number of pixels in img that are not black.
-        img must be a Numpy array with colour values along the last axis."""
-        return img.any(axis=-1).sum()
+    def giveRange(self, count, threshold, width):
+        indices = np.argwhere(count > threshold)
+        rangeC = np.array([[0, 0]])
+        for k in range(0, len(indices) - 1):
+            left = right = indices[k][0]
+            flagL = flagR = False
+            for i in range(0, len(count) - 1):
 
-    def detect_team(self, image, show=True):
-        # define the list of boundaries
-        # print(self.lowerhsv, self.upperhsv, 'detect lower, upper')
-        boundaries = [
-            (self.t1lowerhsv, self.t1upperhsv),
-            (self.t2lowerhsv, self.t2upperhsv)
-        ]
-        i = 0
-        for (lower, upper) in boundaries:
-            # create NumPy arrays from the boundaries
-            lower = np.array(lower, dtype="uint8")
-            upper = np.array(upper, dtype="uint8")
+                if (indices[k][0] - i > 0 and count[indices[k][0] - i] > width and not flagL):
+                    left = indices[k][0] - i
+                else:
+                    flagL = True
 
-            # find the colors within the specified boundaries and apply
-            # the mask
-            mask = cv2.inRange(image, lower, upper)
-            output = cv2.bitwise_and(image, image, mask=mask)
-            tot_pix = self.count_nonblack_np(image)
-            color_pix = self.count_nonblack_np(output)
-            ratio = color_pix / tot_pix
-            print("ratio is:", ratio)
-            # print(self.t1color, self.t2color, 'self.t1color, self.t2color')
-            if ratio > 0.01 and i == 0:
-                return self.t1color
-            elif ratio > 0.01 and i == 1:
-                return self.t2color
+                if (indices[k][0] + i < len(count) and count[indices[k][0] + i] > width and not flagR):
+                    right = indices[k][0] + i
+                else:
+                    flagR = True
 
-            i += 1
+                if (flagL and flagR):
+                    rangeC = np.append(rangeC, [[left / 256, right / 256]], axis=0)
+                    break
+        rangeC = np.delete(rangeC, 0, 0)
+        return rangeC
 
-            if show == True:
-                cv2.imshow("images", np.hstack([image, output]))
-                if cv2.waitKey(0) & 0xFF == ord('q'):
-                    cv2.destroyAllWindows()
-        return 'not_sure'
+    def segmentsIn(self, rangeC):
+        seg = []
+        for i in range(0, len(rangeC)):
+            start = round(rangeC[i][0], 2)
+            end = round(rangeC[i][1], 2)
+            seg = np.append(seg, [start, end])
+            for j in range(1, int(100 * (end - start))):
+                seg = np.append(seg, round(start + 0.01 * j, 2))
+        return list(set(seg))
 
     def detectstart(self):
         global source
+
+        seg = []
+        features = []
+        playerIndices = []
+
+        hsv1 = []
+        hsv2 = []
+
+        team1 = []
+        team2 = []
+
         if self.lbox.currentItem() == None:
             QMessageBox.warning(self, '오류', '재생할 동영상 파일이 없습니다.  ')
         else:
@@ -210,7 +231,7 @@ class WindowClass(QMainWindow):
                 fourcc = cv2.VideoWriter_fourcc(*'DIVX')
                 # writer = cv2.VideoWriter(source + '_detecting.avi', fourcc, fps, (640, 360))
 
-                print(self.t1name, self.t2name)
+                # print(self.t1name, self.t2name)
                 # t2color = self.colorfinder(t2color)
                 global cap
                 cap = cv2.VideoCapture(source)
@@ -269,37 +290,109 @@ class WindowClass(QMainWindow):
                                                 label = cat['name'] # 여기까지 사람추출해내고 라벨에 person 대입
 
                                         ## extract every person
-                                        if label == 'person':
-                                            # crop them
-                                            crop_img = image_np[ymin:ymax, xmin:xmax]
-                                            player_hsv = cv2.cvtColor(crop_img, cv2.COLOR_BGR2HSV)
-                                            mask1 = cv2.inRange(player_hsv, self.t1lowerhsv, self.t1upperhsv)
-                                            res1 = cv2.bitwise_and(crop_img, crop_img, mask=mask1)
-                                            res1 = cv2.cvtColor(res1, cv2.COLOR_HSV2BGR)
-                                            res1 = cv2.cvtColor(res1, cv2.COLOR_BGR2GRAY)
-                                            nzCount = cv2.countNonZero(res1)
+                                        # if label == 'person':
 
-                                            mask2 = cv2.inRange(player_hsv, self.t2lowerhsv, self.t2upperhsv)
-                                            res2 = cv2.bitwise_and(crop_img, crop_img, mask=mask2)
-                                            res2 = cv2.cvtColor(res2, cv2.COLOR_HSV2BGR)
-                                            res2 = cv2.cvtColor(res2, cv2.COLOR_BGR2GRAY)
-                                            nzCountred = cv2.countNonZero(res2)
+                                        crop_img = image_np[ymin:ymax, xmin:xmax]
 
-                                            if (nzCount >= 20):
-                                                # Mark blue jersy players as france
-                                                cv2.putText(image_np, self.t1name, (xmin - 2, ymin - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2,
-                                                            cv2.LINE_AA)
-                                                cv2.rectangle(image_np, (xmin, ymin), (xmax, ymax), (255, 0, 0), 3)
-                                            else:
-                                                pass
-                                            if (nzCountred >= 20):
-                                                # Mark red jersy players as belgium
-                                                cv2.putText(image_np, self.t2name, (xmin - 2, ymin - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2,
-                                                            cv2.LINE_AA)
-                                                cv2.rectangle(image_np, (xmin, ymin), (xmax, ymax), (0, 0, 255), 3)
-                                            else:
-                                                pass
+                                        img = cv2.resize(crop_img, dsize=(50, 100), interpolation=cv2.INTER_LINEAR)
+                                        HSV = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
+                                        H = HSV[:, :, 0]
+                                        S = HSV[:, :, 1]
+                                        V = HSV[:, :, 2]
+
+                                        countH, _ = np.histogram(H, 256)
+                                        countS, _ = np.histogram(S, 256)
+                                        countV, _ = np.histogram(V, 256)
+
+                                        meanH = np.mean(H)
+                                        meanS = np.mean(S)
+                                        meanV = np.mean(V)
+                                        medianH = np.median(H)
+                                        medianS = np.median(S)
+                                        medianV = np.median(V)
+
+                                        features.append([meanH, meanS, meanV, medianH, medianS, medianV])
+
+                                        rangeH = self.giveRange(countH, 15, 10)
+                                        rangeS = self.giveRange(countS, 5, 4)
+                                        rangeV = self.giveRange(countV, 5, 3)
+
+                                        segH = self.segmentsIn(rangeH)
+                                        segS = self.segmentsIn(rangeS)
+                                        segV = self.segmentsIn(rangeV)
+
+                                        seg.append([segH, segS, segV])
+
+
+                                features = np.array(features).astype(np.float32)
+                                criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+                                flags = cv2.KMEANS_RANDOM_CENTERS
+                                _, idx, _ = cv2.kmeans(features, 2, None, criteria, 15, flags)
+                                print(idx)
+                                hsv1 = []
+                                hsv2 = []
+                                print(seg)
+                                for i in range(0, len(seg)):
+                                    team1 = []
+                                    team2 = []
+                                    for j in range(0, len(idx)):
+                                        if idx[j]:
+                                            team1 = team1 + seg[j][i]
+                                        else:
+                                            team2 = team2 + seg[j][i]
+
+                                    hsv1.append(team1)
+                                    hsv2.append(team2)
+
+                                # removing intersections
+                                print("ssss ", hsv1)
+                                print("zzzz ", hsv2)
+                                sameH = set(hsv1[0]).intersection(hsv2[0])
+                                setH1 = list(set(hsv1[0]) - sameH)
+                                setH2 = list(set(hsv2[0]) - sameH)
+                                rangeSame = self.rangeFor(list(sameH))
+
+                                for i in range(0, len(rangeSame)):
+                                    cnt1 = cnt2 = team1 = team2 = 0
+                                    mask_i = np.zeros(crop_img.shape)
+                                    mask_i[crop_img] = 1
+                                    mask_i = mask_i.astype(np.uint8)
+                                    mask_3i = np.squeeze(np.stack((mask_i,) * 3, -1))
+                                    player = np.multiply(img, mask_3i)
+
+                                H = HSV[:, :, 0]
+
+                                mask = np.zeros(crop_img.shape)
+                                mask[(H > rangeSame[i][0]) & (H < rangeSame[i][1])] = 1
+                                if idx[j]:
+                                    team1 += 1
+                                    cnt1 += mask.sum()
+                                else:
+                                    team2 += 1
+                                    cnt2 += mask.sum()
+
+                                if (cnt1 / team1) > (cnt2 / team2):
+                                    setH1 = np.append(setH1, self.segmentsIn([rangeSame[i]]))
+                                else:
+                                    setH2 = np.append(setH2, self.segmentsIn([rangeSame[i]]))
+
+                                rangeH1 = self.rangeFor(setH1)
+                                rangeH2 = self.rangeFor(setH2)
+                                rangeS1 = self.rangeFor(hsv1[1])
+                                rangeS2 = self.rangeFor(hsv2[1])
+                                rangeV1 = self.rangeFor(hsv1[2])
+                                rangeV2 = self.rangeFor(hsv2[2])
+
+                                print(rangeH1, rangeS1, rangeV1, rangeH2, rangeS2, rangeV2)
+
+                                for i in range(len(idx)):
+                                    if idx[0][i] == int(1):
+                                        cv2.putText(image_np, self.t1name, (xmin - 2, ymin - 2),
+                                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2, cv2.LINE_AA)
+                                    else:
+                                        cv2.putText(image_np, self.t2name, (xmin - 2, ymin - 2),
+                                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2, cv2.LINE_AA)
 
                             cv2.imshow('image', image_np)
 
@@ -384,6 +477,7 @@ class t1SettingDialog(QDialog):
 
             screen = ImageGrab.grab()
             rgb = screen.getpixel(pyautogui.position())
+            print(rgb, 'rgb')
 
             pixel = np.uint8([[rgb]])
             t1hsv = cv2.cvtColor(pixel, cv2.COLOR_RGB2HSV)
@@ -467,6 +561,7 @@ class t2SettingDialog(QDialog):
         if e.buttons():
             screen = ImageGrab.grab()
             rgb = screen.getpixel(pyautogui.position())
+            print(rgb, 'rgb')
 
             pixel = np.uint8([[rgb]])
             t1hsv = cv2.cvtColor(pixel, cv2.COLOR_RGB2HSV)

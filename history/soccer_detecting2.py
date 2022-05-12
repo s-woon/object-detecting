@@ -27,9 +27,9 @@ upper_blue3 = 0
 
 save_dir = './video'
 
-sys.path.append("..")
-PATH_TO_CKPT = './model/frozen_inference_graph.pb'
-PATH_TO_LABELS = './data/mscoco_label_map.pbtxt'
+sys.path.append("../..")
+PATH_TO_CKPT = '../model/frozen_inference_graph.pb'
+PATH_TO_LABELS = '../data/mscoco_label_map.pbtxt'
 
 NUM_CLASSES = 90
 

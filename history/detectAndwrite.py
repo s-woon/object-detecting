@@ -93,7 +93,7 @@ class WindowClass(QMainWindow):
                 cfg = './yolov3.cfg'
                 net = cv2.dnn.readNet(weight, cfg)
                 classes = None
-                with open('./yolov3.txt', 'r') as f:
+                with open('../yolov3.txt', 'r') as f:
                     classes = [line.strip() for line in f.readlines()]
                 layer_names = net.getLayerNames()
                 output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]

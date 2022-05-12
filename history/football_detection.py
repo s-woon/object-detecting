@@ -44,7 +44,7 @@ cfg = './yolov3.cfg'
 net = cv2.dnn.readNet(weight, cfg)
 
 classes = None
-with open('./yolov3.txt', 'r') as f:
+with open('../yolov3.txt', 'r') as f:
     classes = [line.strip() for line in f.readlines()]
 
 import os
@@ -154,7 +154,7 @@ print('proportion of red : {}'.format(round(len(result[result!=0])/(result.shape
 
 # ### 4. person image crop
 
-PATH = './person_imgs'
+PATH = '../person_imgs'
 # os.mkdir(PATH)
 
 import cv2
@@ -163,7 +163,7 @@ cfg = './yolov3.cfg'
 net = cv2.dnn.readNet(weight, cfg)
 
 classes = None
-with open('./yolov3.txt', 'r') as f:
+with open('../yolov3.txt', 'r') as f:
     classes = [line.strip() for line in f.readlines()]
 
 def getFrame(sec, video_path):
@@ -222,7 +222,7 @@ def get_person_imgs(img, net, conf_t, nms_t, path):
                 pass
 
 for i in range(150):
-    success, img = getFrame(60 + i*2, './videos/[2021 PL 10R] S햄튼 vs 맨유 HL.mp4')
+    success, img = getFrame(60 + i * 2, '../videos/[2021 PL 10R] S햄튼 vs 맨유 HL.mp4')
     if success:
         path = './person_imgs/' + 'video1_frame' + '_' + str(i) + '_'
         get_person_imgs(img, net, 0.3, 0.4, path)
@@ -259,7 +259,7 @@ for i in range(150):
 
 # get_ipython().system('tar chvfz notebook.tar.gz ./person_imgs*')
 
-len(os.listdir('./person_imgs'))
+len(os.listdir('../person_imgs'))
 
 train_valid_test_split('./player_train', 0.9, 0.1)
 
@@ -556,9 +556,9 @@ write_video(video3, './MU_third.avi',
             mu_color = 'third', referee_color = 'yellow', 
             length = 20)
 
-write_video('./videos/[2021 PL 30R] 맨유 vs 브라이튼 HL.mp4', './MU_home_test.avi', 
-            start_sec = 70, conf_t = 0.7, 
-            pred_t_player =0.8,pred_t_referee =0.1, 
-            mu_color = 'home', referee_color = 'black', 
+write_video('../videos/[2021 PL 30R] 맨유 vs 브라이튼 HL.mp4', './MU_home_test.avi',
+            start_sec = 70, conf_t = 0.7,
+            pred_t_player =0.8, pred_t_referee =0.1,
+            mu_color = 'home', referee_color = 'black',
             length = 20)
 
