@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog, QMessageBox,
 from PyQt5.uic import loadUi
 from pytube import YouTube
 
-from history import readyolo
+import readyolo
 
 hsv = 0
 
@@ -24,7 +24,7 @@ net = cv2.dnn.readNet(weight, cfg)
 layer_names = net.getLayerNames()
 output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
 classes = None
-with open('./yolov3.txt', 'r') as f:
+with open('classes.txt', 'r') as f:
     classes = [line.strip() for line in f.readlines()]
 
 boxes = []
@@ -72,7 +72,7 @@ class Thread(QThread):
 class WindowClass(QMainWindow):
     def __init__(self):
         super(WindowClass, self).__init__()
-        loadUi('main6.ui', self)
+        loadUi('main.ui', self)
         self.th = Thread(self)
         self.i = 0
 
@@ -210,10 +210,7 @@ class WindowClass(QMainWindow):
                 QMessageBox.warning(self, '오류', '재생할 동영상 파일이 선택되지 않았습니다.  ')
             else:
                 print("Detecting start")
-                global writer
-                fps = 29.97
-                fourcc = cv2.VideoWriter_fourcc(*'DIVX')
-                writer = cv2.VideoWriter(source + '_detecting.avi', fourcc, fps, (640, 360))
+
                 print(self.t1nameLE.text(), self.t2nameLE.text())
                 global cap
 
@@ -223,6 +220,13 @@ class WindowClass(QMainWindow):
 
                 # 영상 불러오기
                 cap = cv2.VideoCapture(source)
+                width = int(cap.get(3))
+                height = int(cap.get(4))
+
+                global writer
+                fps = 29.97
+                fourcc = cv2.VideoWriter_fourcc(*'DIVX')
+                writer = cv2.VideoWriter(source + '_detecting.avi', fourcc, fps, (width, height))
 
                 while cap.isOpened():
                     ret, frame = cap.read()
@@ -326,7 +330,7 @@ class WindowClass(QMainWindow):
 class t1SettingDialog(QDialog):
     def __init__(self):
         super(t1SettingDialog, self).__init__()
-        loadUi('dialog2.ui', self)
+        loadUi('dialog.ui', self)
 
         self.saveBtn.clicked.connect(self.save)
         self.cancelBtn.clicked.connect(self.cancel)
@@ -365,7 +369,7 @@ class t1SettingDialog(QDialog):
 class t2SettingDialog(QDialog):
     def __init__(self):
         super(t2SettingDialog, self).__init__()
-        loadUi('dialog2.ui', self)
+        loadUi('dialog.ui', self)
 
         self.saveBtn.clicked.connect(self.save)
         self.cancelBtn.clicked.connect(self.cancel)
