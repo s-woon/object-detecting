@@ -138,7 +138,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>detecting</string>
+     <string>Detecting</string>
     </property>
    </widget>
    <widget class="QGroupBox" name="team1">

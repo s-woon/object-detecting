@@ -124,24 +124,26 @@ class WindowClass(QMainWindow):
     def t1setting(self):
         dlg = t1SettingDialog()
         dlg.exec_()
-        if dlg.tname:
+        if dlg.tname and dlg.t1image:
             self.t1name = dlg.tname
             self.t1nameLE.setText(self.t1name)
-        elif dlg.t1image:
             self.t1hist = dlg.t1hist
             self.t1image = dlg.t1image
             self.t1imageLB.setPixmap(QPixmap.fromImage(self.t1image).scaled(self.t1imageLB.size(), Qt.KeepAspectRatio))
+        else:
+            pass
 
     def t2setting(self):
         dlg = t2SettingDialog()
         dlg.exec_()
-        if dlg.tname:
+        if dlg.tname and dlg.t2image:
             self.t2name = dlg.tname
             self.t2nameLE.setText(self.t2name)
-        elif dlg.t1image:
             self.t2hist = dlg.t2hist
             self.t2image = dlg.t2image
             self.t2imageLB.setPixmap(QPixmap.fromImage(self.t2image).scaled(self.t2imageLB.size(), Qt.KeepAspectRatio))
+        else:
+            pass
 
 # 비디오 재생관리
     def video(self, image):
