@@ -14,6 +14,7 @@ from pytube import YouTube
 
 from media import CMultiMedia
 import readyolo
+from camera import Camera
 
 hsv = 0
 
@@ -37,10 +38,11 @@ nms_threshold = 0.4
 
 class Thread(QThread):
     changePixmap = pyqtSignal(QImage)
+    Frame = pyqtSignal(np.ndarray)
 
     def run(self):
         global cap
-        cap = cv2.VideoCapture(source)
+        cap = cv2.VideoCapture(0)
 
         while True:
             ret, frame = cap.read()
@@ -60,9 +62,11 @@ class Thread(QThread):
                 # delay = round(1000/fps)
 
                 rgbImage = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                rgbImage = cv2.flip(rgbImage, 1)
                 cvc = QImage(rgbImage.data, rgbImage.shape[1], rgbImage.shape[0], QImage.Format_RGB888)
                 p = cvc.scaled(1280, 720, Qt.KeepAspectRatio)
                 self.changePixmap.emit(p)
+                self.Frame.emit(rgbImage)
 
                 sleep(0.028)
             else:
@@ -120,6 +124,18 @@ class WindowClass(QMainWindow):
         self.croppersonBtn.clicked.connect(self.crop_personimg)
 
         self.detectBtn.clicked.connect(self.detectstart)
+
+        # stackedWidget
+        self.actionmain.triggered.connect(self.gomain)
+        self.actioncamera.triggered.connect(self.gocamera)
+
+        self.stackedWidget.insertWidget(1, Camera(self, self.th))
+
+    def gomain(self):
+        self.stackedWidget.setCurrentIndex(0)
+
+    def gocamera(self):
+        self.stackedWidget.setCurrentIndex(1)
 
     def t1setting(self):
         dlg = t1SettingDialog()
@@ -281,6 +297,7 @@ class WindowClass(QMainWindow):
 
                                 compare = cv2.compareHist(histogram, self.t1hist, cv2.HISTCMP_CHISQR)
                                 print(compare, 'compare')
+                                # int(x) 값으로 비교값 조절
                                 if compare < int(8):
                                     cv2.putText(frame, self.t1name, (x - 2, y - 2),
                                                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 1,
